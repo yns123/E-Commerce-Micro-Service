@@ -59,6 +59,7 @@ app.Run();
 - `decimal` alanlara `HasPrecision(18, 2)` (SQL Server'da vermezsen EF uyarı verir ve kırpma olabilir).
 - Paket: `Microsoft.EntityFrameworkCore.SqlServer` + `Microsoft.EntityFrameworkCore.Design` (migration için).
 - `EnableRetryOnFailure` açıkken elle `BeginTransaction` kullanma; tek `SaveChangesAsync` yeterli. Gerekirse `db.Database.CreateExecutionStrategy()` ile sar.
+- `Data/<Ad>DbContextFactory.cs` içinde `IDesignTimeDbContextFactory<<Ad>DbContext>` yaz (bağlantı dizesini `ConnectionStrings__Default` env var'ından, yoksa yerel bir varsayılandan alsın). Bunsuz `dotnet ef migrations add` komutu Program.cs'i tam olarak çalıştırmaya çalışır; `AddJwtAuth` (Jwt:Key eksik) veya EventBus kurulumu tasarım zamanında istisna fırlatıp komutu çökertir (Identity'de Faz 2'de yaşandı).
 - İlk migration: `dotnet ef migrations add Initial --project src/Services/<Ad>/<Ad>.Api -o Data/Migrations`
 
 ## 5. Dockerfile (build context = repo kökü)

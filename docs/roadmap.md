@@ -22,10 +22,16 @@ Her faz tek başına çalışır durumda bitmelidir. Bir faz bitince kutucuğunu
 **Notlar:** `AddJwtAuth`/`PagedResult` için docs/architecture.md'deki diyagramda ayrıca listelenmemiş yeni bir proje açıldı: `src/BuildingBlocks/Common` (dokümana eklendi). `AddEventBus(config, queueName)` her çağrıldığında kuyruğu hemen declare ediyor (bağlı routing key olmasa bile); henüz hiçbir event/handler tanımlanmadığından şu an Catalog/Ordering/Notification kuyrukları boş bağlı — bu üçü `AddEventBus`'ı çağırdı, Identity ve Gateway Faz 1'de dokunulmadı (Identity, `identity.user.registered`'ı yayınlamaya başladığında Faz 2'de kendi kuyruğunu ekleyecek). Doğrulandı: `dotnet test` → 10/10 geçti; `docker compose up --build -d` sonrası RabbitMQ'da `ecommerce.events` (topic) + `ecommerce.events.dlx` (fanout) exchange'leri ve `catalog.events`, `ordering.events`, `notification.events` + `ecommerce.deadletter` kuyrukları göründü; health endpoint'leri hâlâ 200.
 
 ## Faz 2 — Identity
-- [ ] Users tablosu, migration, admin seed
-- [ ] register / login / me
-- [ ] `identity.user.registered` yayınla; Notification bunu dinleyip loglasın
+- [x] Users tablosu, migration, admin seed
+- [x] register / login / me
+- [x] `identity.user.registered` yayınla; Notification bunu dinleyip loglasın
 **Doğrulama:** curl ile kayıt → giriş → token ile /me. `docker compose logs notification-worker` içinde hoş geldin e-postası logu.
+
+**Notlar:** İki gerçek sorun bulundu ve düzeltildi:
+1. `dotnet ef migrations add` tam Program.cs'i (host builder) çalıştırdığı için `AddJwtAuth`'un fırlattığı "Jwt:Key ayarlanmamış" hatasıyla tasarım zamanında çöküyordu. Çözüm: `Data/IdentityDbContextFactory.cs` içinde `IDesignTimeDbContextFactory<IdentityDbContext>` — migration komutları artık Program.cs'e hiç dokunmuyor, `ConnectionStrings__Default` env var'ı yoksa yerel bir varsayılana düşüyor. Yeni servis eklerken bu dosya da standart hale getirilmeli (new-service skill'ine not düşüldü değil, burada belirtiliyor).
+2. `.NET 10`'da record DTO'larda `[property: Required, ...]` hedefi kullanmak çalışma zamanında `InvalidOperationException` fırlatıyor ("validation metadata must be associated with the constructor parameter"). Doğrusu: attribute'u doğrudan constructor parametresine yazmak (`[Required] string Email`, `[property: ...]` DEĞİL). `.claude/skills/new-endpoint/SKILL.md` bu şekilde düzeltildi.
+
+Ayrıca: Identity artık `AddEventBus(config, queueName: "identity.events")` çağırdığı için RabbitMQ'da 4. bir kuyruk (`identity.events`) belirdi — Faz 1'in "3 kuyruk" notuyla tutarlı (o not bunu önceden öngörmüştü). docker-compose sonrası uçtan uca doğrulandı: register (201) → duplicate (409) → kısa şifre (400) → login (200, JWT) → `/me` token'lı (200) / token'sız (401) → yanlış şifre (401) → admin seed girişi çalışıyor → notification-worker loglarında "E-POSTA → ...: Hoş geldiniz!" görünüyor → dead-letter kuyruğu boş.
 
 ## Faz 3 — Catalog
 - [ ] Products tablosu, migration, 10 ürün seed

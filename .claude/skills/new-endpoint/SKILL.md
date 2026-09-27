@@ -13,15 +13,16 @@ docs/api-conventions.md → ilgili servisin endpoint tablosuna satır ekle: meto
 ## 2. DTO'lar — Dtos/
 ```csharp
 public sealed record CreateProductRequest(
-    [property: Required, StringLength(200)] string Name,
-    [property: StringLength(2000)] string? Description,
-    [property: Range(0.01, 1_000_000)] decimal Price,
-    [property: Range(0, int.MaxValue)] int Stock,
-    [property: Url] string? ImageUrl);
+    [Required, StringLength(200)] string Name,
+    [StringLength(2000)] string? Description,
+    [Range(0.01, 1_000_000)] decimal Price,
+    [Range(0, int.MaxValue)] int Stock,
+    [Url] string? ImageUrl);
 
 public sealed record ProductDto(Guid Id, string Name, string? Description, decimal Price, int Stock, string? ImageUrl);
 ```
-Record'larda DataAnnotations için `[property: ...]` hedefini kullan, yoksa doğrulama çalışmaz.
+Record'larda DataAnnotations'ı doğrudan constructor parametresine yaz (`[property: ...]` DEĞİL). .NET 10'da `[property: ...]` hedefi kullanılırsa çalışma zamanında
+`InvalidOperationException: ... validation metadata must be associated with the constructor parameter` hatası fırlatılır (Faz 2'de Identity register/login DTO'larında görüldü).
 Entity → DTO dönüşümü için entity'de veya DTO'da basit bir statik metod (`ProductDto.From(product)`) yaz; AutoMapper kullanma.
 
 ## 3. İş kuralı Domain'de
