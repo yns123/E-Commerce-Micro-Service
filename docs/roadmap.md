@@ -34,9 +34,11 @@ Her faz tek başına çalışır durumda bitmelidir. Bir faz bitince kutucuğunu
 Ayrıca: Identity artık `AddEventBus(config, queueName: "identity.events")` çağırdığı için RabbitMQ'da 4. bir kuyruk (`identity.events`) belirdi — Faz 1'in "3 kuyruk" notuyla tutarlı (o not bunu önceden öngörmüştü). docker-compose sonrası uçtan uca doğrulandı: register (201) → duplicate (409) → kısa şifre (400) → login (200, JWT) → `/me` token'lı (200) / token'sız (401) → yanlış şifre (401) → admin seed girişi çalışıyor → notification-worker loglarında "E-POSTA → ...: Hoş geldiniz!" görünüyor → dead-letter kuyruğu boş.
 
 ## Faz 3 — Catalog
-- [ ] Products tablosu, migration, 10 ürün seed
-- [ ] Liste (sayfalı + arama), detay, Admin CRUD
+- [x] Products tablosu, migration, 10 ürün seed
+- [x] Liste (sayfalı + arama), detay, Admin CRUD
 **Doğrulama:** Token'sız POST → 401, müşteri token'ıyla → 403, admin token'ıyla → 201.
+
+**Notlar:** `Data/CatalogDbContextFactory.cs` (`IDesignTimeDbContextFactory`) ilk seferden sorunsuz çalıştı — Faz 2'nin dersi işe yaradı. `RowVersion` (`IsRowVersion()`) alanı entity'ye ve migration'a eklendi; kullanım (optimistic concurrency retry) Faz 5'in işi. `ProcessedMessages` tablosu bilinçli olarak eklenmedi — Catalog'un asıl event handler'ı (`ordering.order.created`) Faz 5'te gelecek, o zaman ikinci bir migration ile eklenecek. Doğrulandı: liste (sayfalı+arama), detay, 404, admin PUT/DELETE (204) hepsi çalıştı; token'sız POST → 401, müşteri token'ıyla POST → 403, admin token'ıyla POST → 201 + Location. Not: Gateway varsayılan YARP ayarıyla orijinal `Host` başlığını downstream'e taşımadığı için `Location` başlığındaki adres dıştan değil iç docker adından (`catalog-api:8080`) üretiliyor — işlevi etkilemiyor (frontend id'yi gövdeden okuyacak) ama bilinçli bir sınırlama olarak not düşülüyor, düzeltme istenirse YARP `RequestHeaderOriginalHost` transform'u eklenebilir.
 
 ## Faz 4 — Frontend (alışveriş)
 - [ ] api.js, auth.js, cart.js, layout.js, format.js, style.css
