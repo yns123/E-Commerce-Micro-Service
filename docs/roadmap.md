@@ -14,10 +14,12 @@ Her faz tek başına çalışır durumda bitmelidir. Bir faz bitince kutucuğunu
 **Notlar:** `dotnet new sln` .NET 10'da varsayılan olarak `.slnx` üretiyor; CLAUDE.md'deki `.sln` kararına uymak için `-f sln` ile klasik format üretildi. Bu fazda servisler henüz DB/JWT/EventBus'a bağlanmıyor (sadece `/health`); `ConnectionStrings`/`Jwt`/`RabbitMq` env değişkenleri docker-compose'a mimari dokümana uygun olarak şimdiden eklendi, ileriki fazlarda kullanılacak.
 
 ## Faz 1 — EventBus
-- [ ] `BuildingBlocks/Contracts`: IntegrationEvent + docs/events.md'deki tüm event record'ları
-- [ ] `BuildingBlocks/EventBus`: IEventBus, RabbitMqEventBus, IIntegrationEventHandler, AddEventBus/AddSubscription, retry + dead-letter
-- [ ] `BuildingBlocks`: AddJwtAuth extension'ı, PagedResult
+- [x] `BuildingBlocks/Contracts`: IntegrationEvent + docs/events.md'deki tüm event record'ları
+- [x] `BuildingBlocks/EventBus`: IEventBus, RabbitMqEventBus, IIntegrationEventHandler, AddEventBus/AddSubscription, retry + dead-letter
+- [x] `BuildingBlocks`: AddJwtAuth extension'ı, PagedResult
 **Doğrulama:** Birim testleri geçer; servisler açıldığında RabbitMQ panelinde exchange'ler ve 3 kuyruk görünür.
+
+**Notlar:** `AddJwtAuth`/`PagedResult` için docs/architecture.md'deki diyagramda ayrıca listelenmemiş yeni bir proje açıldı: `src/BuildingBlocks/Common` (dokümana eklendi). `AddEventBus(config, queueName)` her çağrıldığında kuyruğu hemen declare ediyor (bağlı routing key olmasa bile); henüz hiçbir event/handler tanımlanmadığından şu an Catalog/Ordering/Notification kuyrukları boş bağlı — bu üçü `AddEventBus`'ı çağırdı, Identity ve Gateway Faz 1'de dokunulmadı (Identity, `identity.user.registered`'ı yayınlamaya başladığında Faz 2'de kendi kuyruğunu ekleyecek). Doğrulandı: `dotnet test` → 10/10 geçti; `docker compose up --build -d` sonrası RabbitMQ'da `ecommerce.events` (topic) + `ecommerce.events.dlx` (fanout) exchange'leri ve `catalog.events`, `ordering.events`, `notification.events` + `ecommerce.deadletter` kuyrukları göründü; health endpoint'leri hâlâ 200.
 
 ## Faz 2 — Identity
 - [ ] Users tablosu, migration, admin seed

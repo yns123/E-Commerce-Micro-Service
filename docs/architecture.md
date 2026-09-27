@@ -23,6 +23,7 @@ src/
   BuildingBlocks/
     EventBus/                       # IEventBus, RabbitMqEventBus, IIntegrationEventHandler<T>, IntegrationEvent
     Contracts/                      # Tüm integration event record'ları (servisler bunu referans alır)
+    Common/                         # AddJwtAuth extension'ı, PagedResult<T> (JWT doğrulaması gereken servisler referans alır)
   Services/
     Identity/Identity.Api/
     Catalog/Catalog.Api/
@@ -31,6 +32,7 @@ src/
   Gateway/Gateway.Api/
   Web/                              # statik dosyalar + Dockerfile (nginx)
 tests/
+  EventBus.Tests/
   Identity.Tests/
   Catalog.Tests/
   Ordering.Tests/
