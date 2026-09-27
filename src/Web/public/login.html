@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Giriş — Mağaza</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="site-header"></header>
+  <main class="container">
+    <h1>Giriş Yap</h1>
+    <div id="message" class="message" hidden></div>
+    <form id="login-form" class="form">
+      <label>
+        E-posta
+        <input type="email" name="email" required autocomplete="username">
+      </label>
+      <label>
+        Şifre
+        <input type="password" name="password" required autocomplete="current-password">
+      </label>
+      <button type="submit" class="btn">Giriş Yap</button>
+    </form>
+    <p>Hesabın yok mu? <a href="/register.html">Kayıt ol</a></p>
+  </main>
+  <script type="module" src="js/pages/login.js"></script>
+</body>
+</html>

@@ -41,9 +41,13 @@ Ayrıca: Identity artık `AddEventBus(config, queueName: "identity.events")` ça
 **Notlar:** `Data/CatalogDbContextFactory.cs` (`IDesignTimeDbContextFactory`) ilk seferden sorunsuz çalıştı — Faz 2'nin dersi işe yaradı. `RowVersion` (`IsRowVersion()`) alanı entity'ye ve migration'a eklendi; kullanım (optimistic concurrency retry) Faz 5'in işi. `ProcessedMessages` tablosu bilinçli olarak eklenmedi — Catalog'un asıl event handler'ı (`ordering.order.created`) Faz 5'te gelecek, o zaman ikinci bir migration ile eklenecek. Doğrulandı: liste (sayfalı+arama), detay, 404, admin PUT/DELETE (204) hepsi çalıştı; token'sız POST → 401, müşteri token'ıyla POST → 403, admin token'ıyla POST → 201 + Location. Not: Gateway varsayılan YARP ayarıyla orijinal `Host` başlığını downstream'e taşımadığı için `Location` başlığındaki adres dıştan değil iç docker adından (`catalog-api:8080`) üretiliyor — işlevi etkilemiyor (frontend id'yi gövdeden okuyacak) ama bilinçli bir sınırlama olarak not düşülüyor, düzeltme istenirse YARP `RequestHeaderOriginalHost` transform'u eklenebilir.
 
 ## Faz 4 — Frontend (alışveriş)
-- [ ] api.js, auth.js, cart.js, layout.js, format.js, style.css
-- [ ] index, product, cart, login, register sayfaları
+- [x] api.js, auth.js, cart.js, layout.js, format.js, style.css
+- [x] index, product, cart, login, register sayfaları
 **Doğrulama:** Tarayıcıda kayıt ol, giriş yap, ürün ara, sepete ekle, sayfayı yenileyince sepet duruyor.
+
+**Notlar:** `cart.html`'de "Siparişi ver" butonu bilinçli olarak yok — Ordering'in `POST /api/ordering/orders` endpoint'i henüz yazılmadı (Faz 5), sipariş verme akışı Faz 6'nın işi (roadmap'te açıkça orada). `layout.js`'teki header, henüz var olmayan `orders.html`/`admin.html`'e link veriyor (docs/frontend.md'deki sabit header tanımı); bu sayfalar Faz 6'da eklenecek. `api.js`'in 401-yönlendirme davranışı sadece token zaten varken tetikleniyor — token yokken (ör. login'de yanlış şifre) 401 normal bir hata olarak fırlatılıyor, aksi halde login sayfasında sonsuz yönlendirme döngüsü olurdu (docs bu ayrımı açıkça yazmıyor, ama gerekli bir yorum).
+
+Tarayıcıdan uçtan uca doğrulandı: 10 ürün listelendi → arama ("klavye" → 1 sonuç, URL query'ye yansıdı) → ürün detayına git → sepete ekle (başarı mesajı + header sayacı canlı güncellendi) → `cart.html`'de kalem+toplam doğru → sayfa yenilenince sepet duruyor (localStorage) → kayıt ol → login'e yönlendi → giriş yap → `returnUrl`'e (`index.html`) döndü, sepet korundu → header giriş durumuna göre değişti (Admin linki sadece Admin rolünde görünüyor) → çıkış yapınca oturum temizlendi, sepet kaldı. 375px genişlikte yatay kaydırma yok, konsolda hata yok.
 
 ## Faz 5 — Sipariş akışı
 - [ ] Ordering: Orders/OrderItems/ProcessedMessages, POST/GET endpoint'leri
