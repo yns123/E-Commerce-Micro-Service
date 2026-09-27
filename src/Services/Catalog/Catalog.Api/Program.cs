@@ -1,5 +1,7 @@
 using Catalog.Api.Data;
+using Catalog.Api.IntegrationEvents.Handlers;
 using Common;
+using Contracts;
 using EventBus;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +13,8 @@ builder.Services.AddDbContext<CatalogDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("Default"),
         sql => sql.EnableRetryOnFailure()));
 builder.Services.AddJwtAuth(builder.Configuration);
-builder.Services.AddEventBus(builder.Configuration, queueName: "catalog.events");
+builder.Services.AddEventBus(builder.Configuration, queueName: "catalog.events")
+    .AddSubscription<OrderCreatedIntegrationEvent, OrderCreatedHandler>();
 builder.Services.AddHealthChecks().AddDbContextCheck<CatalogDbContext>();
 
 var app = builder.Build();

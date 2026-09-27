@@ -35,4 +35,14 @@ public sealed class Product
         Stock = stock;
         ImageUrl = imageUrl;
     }
+
+    public bool HasSufficientStock(int quantity) => Stock >= quantity;
+
+    public void ReserveStock(int quantity)
+    {
+        if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity));
+        if (!HasSufficientStock(quantity)) throw new InvalidOperationException("Yetersiz stok.");
+
+        Stock -= quantity;
+    }
 }

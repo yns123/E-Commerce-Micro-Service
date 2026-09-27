@@ -50,12 +50,20 @@ Ayrıca: Identity artık `AddEventBus(config, queueName: "identity.events")` ça
 Tarayıcıdan uçtan uca doğrulandı: 10 ürün listelendi → arama ("klavye" → 1 sonuç, URL query'ye yansıdı) → ürün detayına git → sepete ekle (başarı mesajı + header sayacı canlı güncellendi) → `cart.html`'de kalem+toplam doğru → sayfa yenilenince sepet duruyor (localStorage) → kayıt ol → login'e yönlendi → giriş yap → `returnUrl`'e (`index.html`) döndü, sepet korundu → header giriş durumuna göre değişti (Admin linki sadece Admin rolünde görünüyor) → çıkış yapınca oturum temizlendi, sepet kaldı. 375px genişlikte yatay kaydırma yok, konsolda hata yok.
 
 ## Faz 5 — Sipariş akışı
-- [ ] Ordering: Orders/OrderItems/ProcessedMessages, POST/GET endpoint'leri
-- [ ] Catalog: `ordering.order.created` handler'ı (ya hep ya hiç stok rezervasyonu)
-- [ ] Ordering: stock.reserved / reservation-failed handler'ları
-- [ ] Notification: confirmed / cancelled handler'ları
-- [ ] Birim testleri: Product.ReserveStock, Order.Confirm/Cancel, handler idempotency
+- [x] Ordering: Orders/OrderItems/ProcessedMessages, POST/GET endpoint'leri
+- [x] Catalog: `ordering.order.created` handler'ı (ya hep ya hiç stok rezervasyonu)
+- [x] Ordering: stock.reserved / reservation-failed handler'ları
+- [x] Notification: confirmed / cancelled handler'ları
+- [x] Birim testleri: Product.ReserveStock, Order.Confirm/Cancel, handler idempotency
 **Doğrulama:** Stoğu yeterli sipariş → birkaç saniyede Confirmed, stok düşmüş. Stoktan fazla sipariş → Cancelled, stok değişmemiş. Aynı mesaj iki kez işlenince stok iki kez düşmüyor.
+
+**Notlar:**
+- Catalog'un `Product.RowVersion` alanı SQL Server'da otomatik üretilen `rowversion`; SQLite'ta (birim testlerinde kullanılan sağlayıcı) otomatik üretilmiyor ve `IsRowVersion()` property'yi store-generated işaretlediği için testte elle atanan değer INSERT'e hiç gitmiyordu (`NOT NULL constraint failed`). Çözüm: `CatalogDbContext.OnModelCreating`'de `!Database.IsSqlServer()` durumunda `RowVersion` için `ValueGeneratedNever()` — sadece test sağlayıcısını etkiliyor, üretimdeki SQL Server davranışı değişmedi. Testte `AddWithRowVersion` yardımcı metoduyla (`tests/Catalog.Tests/TestDbContextFactory.cs`) `Guid.NewGuid().ToByteArray()` atanıyor (new-integration-event skill'inin önerdiği kalıp).
+- `OrderCreatedHandler`'daki "ya hep ya hiç" + eşzamanlılık retry: her denemede ürünler yeniden sorgulanıyor (stok yeterliliği taze veriyle kontrol ediliyor), `DbUpdateConcurrencyException` olursa `ChangeTracker` temizlenip en fazla 3 kez yeniden deneniyor; üçüncü denemede de çakışma olursa EventBus'ın kendi retry/dead-letter mekanizmasına düşüyor.
+- `Order.Confirm`/`Cancel` domain metodları `Status != Pending` durumunda no-op (idempotency güvencesi domain seviyesinde de var; handler'daki `ProcessedMessages` kontrolü birincil savunma hattı).
+- `OrderStatus` enum'u JSON'da string olarak dönüyor (`JsonStringEnumConverter`, Ordering.Api Program.cs'e eklendi — Identity/Catalog'da şu an enum döndüren alan olmadığı için oraya eklenmedi).
+
+Docker'da uçtan uca doğrulandı: yeterli stoklu sipariş (3× Kablosuz Mouse) birkaç saniyede Confirmed oldu, toplam doğru hesaplandı (449.50×3=1348.50), stok 40→37 düştü. Stoktan fazla sipariş (999× Masaüstü Hoparlör, stok 12) Cancelled oldu, `cancelReason` doldu, stok değişmedi. Boş sepet ve `quantity<1` → 400, token'sız → 401. Aynı ürün iki kez sepette → tek kaleme birleşti (miktar toplandı). Başka kullanıcının siparişine erişim → 404 (403 değil, varlık sızdırılmadı). `notification-worker` loglarında hem "onaylandı" hem "iptal edildi" e-postaları göründü, `ecommerce.deadletter` boş kaldı.
 
 ## Faz 6 — Frontend (sipariş ve admin)
 - [ ] cart.html'den sipariş ver, orders.html durum takibi
