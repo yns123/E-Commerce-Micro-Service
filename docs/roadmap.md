@@ -66,9 +66,15 @@ Tarayıcıdan uçtan uca doğrulandı: 10 ürün listelendi → arama ("klavye" 
 Docker'da uçtan uca doğrulandı: yeterli stoklu sipariş (3× Kablosuz Mouse) birkaç saniyede Confirmed oldu, toplam doğru hesaplandı (449.50×3=1348.50), stok 40→37 düştü. Stoktan fazla sipariş (999× Masaüstü Hoparlör, stok 12) Cancelled oldu, `cancelReason` doldu, stok değişmedi. Boş sepet ve `quantity<1` → 400, token'sız → 401. Aynı ürün iki kez sepette → tek kaleme birleşti (miktar toplandı). Başka kullanıcının siparişine erişim → 404 (403 değil, varlık sızdırılmadı). `notification-worker` loglarında hem "onaylandı" hem "iptal edildi" e-postaları göründü, `ecommerce.deadletter` boş kaldı.
 
 ## Faz 6 — Frontend (sipariş ve admin)
-- [ ] cart.html'den sipariş ver, orders.html durum takibi
-- [ ] admin.html ürün yönetimi
+- [x] cart.html'den sipariş ver, orders.html durum takibi
+- [x] admin.html ürün yönetimi
 **Doğrulama:** Tarayıcıdan uçtan uca: sepet → sipariş → Pending → Confirmed. Admin olarak ürün ekle, listede görün.
+
+**Notlar:** `cart.html`'e "Siparişi Ver" butonu eklendi (Faz 4'te bilinçli olarak bırakılmıştı); giriş yapmamış kullanıcı butona basınca `login.html?returnUrl=/cart.html`'e yönlendiriliyor (sepet API'si `[Authorize]` olduğu için, misafir sepetinde gezinmeye izin vermeye devam ediyoruz). `orders.html` en fazla 30 saniye boyunca 2 saniyede bir yeniden sorguluyor, Pending kalmayınca duruyor; `?highlight=<orderId>` ile gelen sipariş `order-card--highlight` sınıfıyla vurgulanıyor. `admin.html`'de satır bazlı düzenleme (inline form) ve silme onayı `<dialog>` ile (confirm() kullanılmadı).
+
+Tarayıcıdan uçtan uca doğrulandı: sepete ekle → "Siparişi Ver" → `orders.html?highlight=...`'e yönlendi (test ortamında event işleme çok hızlı olduğu için sayfa yüklendiğinde sipariş zaten Onaylandı durumundaydı, ama curl ile Faz 5'te Pending→Confirmed geçişi ayrıca doğrulanmıştı) → sepet temizlendi. Admin: yeni ürün ekle → listede göründü → satırı düzenle (stok değişti, kaydedildi) → sil (dialog ile onay, listeden kalktı). Customer rolüyle `admin.html`'e gidince `index.html`'e yönlendirildi (`requireAdmin`). 375px genişlikte iki sayfada da yatay kaydırma yok, konsolda hata yok.
+
+**Roadmap tamamlandı** — Faz 0-6 bitti. Kalan tek şey Faz 7 (opsiyonel iyileştirmeler), sadece istenirse yapılacak.
 
 ## Faz 7 — Opsiyonel iyileştirmeler (sadece istenirse)
 - [ ] Transactional Outbox (Ordering ve Catalog için)

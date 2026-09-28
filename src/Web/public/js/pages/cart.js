@@ -1,12 +1,26 @@
+import { api, ApiError } from '../api.js';
 import { renderHeader } from '../layout.js';
 import { formatPrice } from '../format.js';
-import { getCart, updateQuantity, removeFromCart } from '../cart.js';
+import { getCart, updateQuantity, removeFromCart, clearCart } from '../cart.js';
+import { isLoggedIn } from '../auth.js';
 
 renderHeader();
 
 const content = document.getElementById('content');
+const message = document.getElementById('message');
+
+function showError(text) {
+  message.textContent = text;
+  message.className = 'message message--error';
+  message.hidden = false;
+}
+
+function hideMessage() {
+  message.hidden = true;
+}
 
 function render() {
+  hideMessage();
   const cart = getCart();
   content.replaceChildren();
 
@@ -62,6 +76,39 @@ function render() {
   totalRow.className = 'cart-total';
   totalRow.textContent = `Toplam: ${formatPrice(total)}`;
   content.append(totalRow);
+
+  const actions = document.createElement('div');
+  actions.className = 'cart-actions';
+
+  const orderButton = document.createElement('button');
+  orderButton.type = 'button';
+  orderButton.className = 'btn';
+  orderButton.textContent = 'Siparişi Ver';
+  orderButton.addEventListener('click', () => submitOrder(cart, orderButton));
+  actions.append(orderButton);
+
+  content.append(actions);
+}
+
+async function submitOrder(cart, button) {
+  if (!isLoggedIn()) {
+    location.href = `/login.html?returnUrl=${encodeURIComponent('/cart.html')}`;
+    return;
+  }
+
+  hideMessage();
+  button.disabled = true;
+
+  try {
+    const items = cart.map((item) => ({ productId: item.productId, quantity: item.quantity }));
+    const response = await api('/api/ordering/orders', { method: 'POST', body: { items } });
+    clearCart();
+    location.href = `/orders.html?highlight=${response.orderId}`;
+  } catch (err) {
+    button.disabled = false;
+    if (err instanceof ApiError) showError(err.message);
+    else showError('Sipariş verilemedi.');
+  }
 }
 
 render();
