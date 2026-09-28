@@ -3,13 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Ordering.Api.Domain;
 using Ordering.Api.IntegrationEvents.Handlers;
 using Xunit;
+using static Ordering.Tests.OutboxTestHelpers;
 
 namespace Ordering.Tests;
 
 public class StockReservationFailedHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_cancels_order_and_publishes_OrderCancelled()
+    public async Task HandleAsync_cancels_order_and_enqueues_OrderCancelled_in_outbox()
     {
         using var db = TestDbContextFactory.CreateInMemory(out var connection);
         using var _ = connection;
@@ -18,8 +19,7 @@ public class StockReservationFailedHandlerTests
         db.Orders.Add(order);
         await db.SaveChangesAsync();
 
-        var bus = new FakeEventBus();
-        var handler = new StockReservationFailedHandler(db, bus);
+        var handler = new StockReservationFailedHandler(db, CreateOutbox(db));
 
         var @event = new StockReservationFailedIntegrationEvent(order.Id, "Yetersiz stok.");
 
@@ -29,8 +29,9 @@ public class StockReservationFailedHandlerTests
         Assert.Equal(OrderStatus.Cancelled, reloaded.Status);
         Assert.Equal("Yetersiz stok.", reloaded.CancelReason);
 
-        var published = Assert.Single(bus.Published);
-        Assert.IsType<OrderCancelledIntegrationEvent>(published);
+        var outboxEvents = await GetOutboxEventsAsync(db);
+        var enqueued = Assert.Single(outboxEvents);
+        Assert.IsType<OrderCancelledIntegrationEvent>(enqueued);
     }
 
     [Fact]
@@ -43,14 +44,14 @@ public class StockReservationFailedHandlerTests
         db.Orders.Add(order);
         await db.SaveChangesAsync();
 
-        var bus = new FakeEventBus();
-        var handler = new StockReservationFailedHandler(db, bus);
+        var handler = new StockReservationFailedHandler(db, CreateOutbox(db));
 
         var @event = new StockReservationFailedIntegrationEvent(order.Id, "Yetersiz stok.");
 
         await handler.HandleAsync(@event, CancellationToken.None);
         await handler.HandleAsync(@event, CancellationToken.None);
 
-        Assert.Single(bus.Published);
+        var outboxEvents = await GetOutboxEventsAsync(db);
+        Assert.Single(outboxEvents);
     }
 }

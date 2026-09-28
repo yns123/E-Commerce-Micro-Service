@@ -1,12 +1,13 @@
 using Contracts;
 using EventBus;
+using EventBus.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Ordering.Api.Data;
 using Ordering.Api.Domain;
 
 namespace Ordering.Api.IntegrationEvents.Handlers;
 
-public sealed class StockReservedHandler(OrderingDbContext db, IEventBus eventBus) : IIntegrationEventHandler<StockReservedIntegrationEvent>
+public sealed class StockReservedHandler(OrderingDbContext db, IOutbox outbox) : IIntegrationEventHandler<StockReservedIntegrationEvent>
 {
     public async Task HandleAsync(StockReservedIntegrationEvent @event, CancellationToken ct)
     {
@@ -20,8 +21,8 @@ public sealed class StockReservedHandler(OrderingDbContext db, IEventBus eventBu
         order.Confirm(resolvedItems);
 
         db.ProcessedMessages.Add(new ProcessedMessage(@event.Id));
-        await db.SaveChangesAsync(ct);
+        outbox.Enqueue(new OrderConfirmedIntegrationEvent(order.Id, order.UserEmail, order.Total));
 
-        await eventBus.PublishAsync(new OrderConfirmedIntegrationEvent(order.Id, order.UserEmail, order.Total), ct);
+        await db.SaveChangesAsync(ct);
     }
 }

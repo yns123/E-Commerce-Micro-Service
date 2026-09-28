@@ -77,6 +77,13 @@ Tarayıcıdan uçtan uca doğrulandı: sepete ekle → "Siparişi Ver" → `orde
 **Roadmap tamamlandı** — Faz 0-6 bitti. Kalan tek şey Faz 7 (opsiyonel iyileştirmeler), sadece istenirse yapılacak.
 
 ## Faz 7 — Opsiyonel iyileştirmeler (sadece istenirse)
-- [ ] Transactional Outbox (Ordering ve Catalog için)
-- [ ] Integration testleri (WebApplicationFactory + Testcontainers)
-- [ ] Structured logging + correlation id (event'lere taşınarak)
+- [x] Transactional Outbox (Ordering ve Catalog için)
+- [ ] Integration testleri (WebApplicationFactory + Testcontainers) — istenmedi, yapılmadı
+- [x] Structured logging + correlation id (event'lere taşınarak)
+
+**Notlar:**
+- **Outbox:** `src/BuildingBlocks/EventBus/Outbox` — `IOutbox.Enqueue<T>(event)` event'i o servisin DbContext'ine ekler (henüz kaydetmez); iş değişikliğiyle **aynı SaveChangesAsync'te** yazılır. Ayrı bir `OutboxDispatcherHostedService<TContext>` 2 saniyede bir işlenmemiş mesajları okuyup gerçek `IEventBus` ile RabbitMQ'ya yayınlıyor. Ordering ve Catalog'un controller/handler'ları `IEventBus` yerine `IOutbox` enjekte ediyor artık; Identity değişmedi (hâlâ doğrudan `IEventBus.PublishAsync`, roadmap'in kapsamı da zaten sadece Ordering+Catalog). Her ikisine de yeni bir `OutboxMessages` tablosu migration'ı eklendi. Docker'da doğrulandı: `OutboxMessages` tablosunda event enqueue edildiği an `ProcessedAt` NULL, dispatcher birkaç saniye içinde dolduruyor (SQL ile sorgulanarak teyit edildi).
+- **Correlation id / structured logging:** `IntegrationEvent.CorrelationId` eklendi (bilinçli olarak `set`, `init` değil — bkz. docs/events.md). `Common.Correlation` içindeki `ICorrelationIdAccessor` (AsyncLocal) + `CorrelationIdMiddleware` (Gateway dahil tüm HTTP servislerinde, `X-Correlation-Id` header'ını okur/üretir/forward eder) + EventBus'taki `CorrelationStamper` (her `PublishAsync`/`Enqueue` çağrısında ambient id'yi event'e damgalar) ile bir isteğin/siparişin tüm servis sınırlarını aşan yolculuğu tek id ile izlenebiliyor. `Common.AddStructuredLogging()` konsol logger'ının `ILogger.BeginScope` çıktısını basmasını sağlıyor (`ILoggingBuilder.AddSimpleConsole(o => o.IncludeScopes = true)` — ilk denemede sadece `IServiceCollection.Configure<SimpleConsoleFormatterOptions>` kullanmıştım, hiçbir şey basmadı; `ILoggingBuilder` üzerinden `AddSimpleConsole` çağırmak gerekiyormuş, düzeltildi). Docker'da doğrulandı: `X-Correlation-Id: trace-abc-777` ile sipariş verildi → aynı id, Ordering (istek) → Catalog (stok rezervasyonu) → Ordering (onay) → Notification (e-posta) loglarının hepsinde `=> CorrelationId:trace-abc-777` olarak göründü.
+- **Yapılmayan:** Integration testleri (WebApplicationFactory + Testcontainers) kullanıcı tarafından bilinçli olarak istenmedi (yeni bir test altyapısı + Docker-in-test bağımlılığı gerektiriyordu).
+
+Doğrulama sonrası mevcut tüm akışlar (Faz 2-6) yeniden test edildi, regresyon yok: `dotnet build` 0 hata, `dotnet test` 25/25, health endpoint'leri 200, dead-letter boş.

@@ -22,8 +22,11 @@ infra/
 src/
   BuildingBlocks/
     EventBus/                       # IEventBus, RabbitMqEventBus, IIntegrationEventHandler<T>, IntegrationEvent
+      Outbox/                       # IOutbox, EfOutbox<TContext>, OutboxDispatcherHostedService<TContext> (Ordering, Catalog)
     Contracts/                      # Tüm integration event record'ları (servisler bunu referans alır)
     Common/                         # AddJwtAuth extension'ı, PagedResult<T> (JWT doğrulaması gereken servisler referans alır)
+      Correlation/                  # ICorrelationIdAccessor, CorrelationIdMiddleware (X-Correlation-Id)
+      Logging/                      # AddStructuredLogging (ILogger.BeginScope'ları konsola basar)
   Services/
     Identity/Identity.Api/
     Catalog/Catalog.Api/
@@ -133,7 +136,7 @@ Jwt__Audience=ecommerce
 Basitlik için servisler `sa` ile bağlanır (sadece geliştirme ortamı; bilinçli basitleştirme).
 
 ## Bilinçli basitleştirmeler
-- Outbox pattern yok: event, `SaveChangesAsync` başarılı olduktan sonra yayınlanır. Nadiren event kaybı olabilir; kabul edildi (roadmap'te opsiyonel faz).
+- Ordering ve Catalog Transactional Outbox kullanıyor (Faz 7 — bkz. docs/events.md → "Transactional Outbox"); Identity kullanmıyor. Identity'nin tek yayınladığı event (`identity.user.registered`), `SaveChangesAsync` başarılı olduktan sonra doğrudan yayınlanır — nadiren event kaybı olabilir, kabul edildi (tek event'lik basit bir akış için Outbox'a değmiyor).
 - Ödeme yok: stok rezerve edilince sipariş onaylanır.
 - Sepet sunucuda tutulmaz; tarayıcıda localStorage'da durur.
 - Refresh token yok; token süresi dolunca kullanıcı tekrar giriş yapar.

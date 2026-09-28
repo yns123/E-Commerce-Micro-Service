@@ -2,11 +2,12 @@ using Catalog.Api.Data;
 using Catalog.Api.Domain;
 using Contracts;
 using EventBus;
+using EventBus.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace Catalog.Api.IntegrationEvents.Handlers;
 
-public sealed class OrderCreatedHandler(CatalogDbContext db, IEventBus eventBus, ILogger<OrderCreatedHandler> logger)
+public sealed class OrderCreatedHandler(CatalogDbContext db, IOutbox outbox, ILogger<OrderCreatedHandler> logger)
     : IIntegrationEventHandler<OrderCreatedIntegrationEvent>
 {
     private const int MaxConcurrencyRetries = 3;
@@ -27,9 +28,8 @@ public sealed class OrderCreatedHandler(CatalogDbContext db, IEventBus eventBus,
             if (hasInsufficientStock)
             {
                 db.ProcessedMessages.Add(new ProcessedMessage(@event.Id));
+                outbox.Enqueue(new StockReservationFailedIntegrationEvent(@event.OrderId, "Yetersiz stok."));
                 await db.SaveChangesAsync(ct);
-
-                await eventBus.PublishAsync(new StockReservationFailedIntegrationEvent(@event.OrderId, "Yetersiz stok."), ct);
                 return;
             }
 
@@ -41,11 +41,11 @@ public sealed class OrderCreatedHandler(CatalogDbContext db, IEventBus eventBus,
             }).ToList();
 
             db.ProcessedMessages.Add(new ProcessedMessage(@event.Id));
+            outbox.Enqueue(new StockReservedIntegrationEvent(@event.OrderId, reservedItems));
 
             try
             {
                 await db.SaveChangesAsync(ct);
-                await eventBus.PublishAsync(new StockReservedIntegrationEvent(@event.OrderId, reservedItems), ct);
                 return;
             }
             catch (DbUpdateConcurrencyException) when (attempt < MaxConcurrencyRetries)
