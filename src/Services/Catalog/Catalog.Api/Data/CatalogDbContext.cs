@@ -1,5 +1,4 @@
 using Catalog.Api.Domain;
-using EventBus.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace Catalog.Api.Data;
@@ -8,12 +7,10 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
 {
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
-    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CatalogDbContext).Assembly);
-        modelBuilder.ConfigureOutbox();
 
         if (!Database.IsSqlServer())
         {

@@ -1,13 +1,12 @@
 using Contracts;
 using EventBus;
-using EventBus.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Ordering.Api.Data;
 using Ordering.Api.Domain;
 
 namespace Ordering.Api.IntegrationEvents.Handlers;
 
-public sealed class StockReservationFailedHandler(OrderingDbContext db, IOutbox outbox)
+public sealed class StockReservationFailedHandler(OrderingDbContext db, IEventBus eventBus)
     : IIntegrationEventHandler<StockReservationFailedIntegrationEvent>
 {
     public async Task HandleAsync(StockReservationFailedIntegrationEvent @event, CancellationToken ct)
@@ -21,8 +20,8 @@ public sealed class StockReservationFailedHandler(OrderingDbContext db, IOutbox 
         order.Cancel(@event.Reason);
 
         db.ProcessedMessages.Add(new ProcessedMessage(@event.Id));
-        outbox.Enqueue(new OrderCancelledIntegrationEvent(order.Id, order.UserEmail, @event.Reason));
-
         await db.SaveChangesAsync(ct);
+
+        await eventBus.PublishAsync(new OrderCancelledIntegrationEvent(order.Id, order.UserEmail, @event.Reason), ct);
     }
 }

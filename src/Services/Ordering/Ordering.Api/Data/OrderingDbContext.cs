@@ -1,4 +1,3 @@
-using EventBus.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Ordering.Api.Domain;
 
@@ -9,11 +8,9 @@ public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> option
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
-    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(OrderingDbContext).Assembly);
-        modelBuilder.ConfigureOutbox();
     }
 }

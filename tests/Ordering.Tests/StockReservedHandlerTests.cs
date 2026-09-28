@@ -3,14 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Ordering.Api.Domain;
 using Ordering.Api.IntegrationEvents.Handlers;
 using Xunit;
-using static Ordering.Tests.OutboxTestHelpers;
 
 namespace Ordering.Tests;
 
 public class StockReservedHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_confirms_order_and_enqueues_OrderConfirmed_in_outbox()
+    public async Task HandleAsync_confirms_order_and_publishes_OrderConfirmed()
     {
         using var db = TestDbContextFactory.CreateInMemory(out var connection);
         using var _ = connection;
@@ -20,7 +19,8 @@ public class StockReservedHandlerTests
         db.Orders.Add(order);
         await db.SaveChangesAsync();
 
-        var handler = new StockReservedHandler(db, CreateOutbox(db));
+        var bus = new FakeEventBus();
+        var handler = new StockReservedHandler(db, bus);
 
         var @event = new StockReservedIntegrationEvent(order.Id, [new ReservedItem(productId, "Ürün", 25m, 2)]);
 
@@ -30,9 +30,8 @@ public class StockReservedHandlerTests
         Assert.Equal(OrderStatus.Confirmed, reloaded.Status);
         Assert.Equal(50m, reloaded.Total);
 
-        var outboxEvents = await GetOutboxEventsAsync(db);
-        var enqueued = Assert.Single(outboxEvents);
-        Assert.IsType<OrderConfirmedIntegrationEvent>(enqueued);
+        var published = Assert.Single(bus.Published);
+        Assert.IsType<OrderConfirmedIntegrationEvent>(published);
     }
 
     [Fact]
@@ -46,14 +45,14 @@ public class StockReservedHandlerTests
         db.Orders.Add(order);
         await db.SaveChangesAsync();
 
-        var handler = new StockReservedHandler(db, CreateOutbox(db));
+        var bus = new FakeEventBus();
+        var handler = new StockReservedHandler(db, bus);
 
         var @event = new StockReservedIntegrationEvent(order.Id, [new ReservedItem(productId, "Ürün", 25m, 2)]);
 
         await handler.HandleAsync(@event, CancellationToken.None);
         await handler.HandleAsync(@event, CancellationToken.None);
 
-        var outboxEvents = await GetOutboxEventsAsync(db);
-        Assert.Single(outboxEvents);
+        Assert.Single(bus.Published);
     }
 }

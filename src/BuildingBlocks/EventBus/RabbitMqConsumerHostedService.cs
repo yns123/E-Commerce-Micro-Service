@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Common.Correlation;
 using Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,10 +12,10 @@ internal sealed class RabbitMqConsumerHostedService(
     RabbitMqConnectionManager connectionManager,
     EventBusSubscriptionsManager subscriptionsManager,
     EventBusQueueName queueName,
-    ICorrelationIdAccessor correlationIdAccessor,
     IServiceScopeFactory scopeFactory,
     ILogger<RabbitMqConsumerHostedService> logger) : BackgroundService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan[] RetryDelays = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)];
 
     private IChannel? _channel;
@@ -67,7 +66,7 @@ internal sealed class RabbitMqConsumerHostedService(
         IntegrationEvent @event;
         try
         {
-            @event = (IntegrationEvent?)JsonSerializer.Deserialize(ea.Body.Span, eventType, EventBusJsonOptions.Default)
+            @event = (IntegrationEvent?)JsonSerializer.Deserialize(ea.Body.Span, eventType, JsonOptions)
                      ?? throw new JsonException("Mesaj gövdesi boş.");
         }
         catch (JsonException ex)
@@ -76,9 +75,6 @@ internal sealed class RabbitMqConsumerHostedService(
             await _channel!.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
             return;
         }
-
-        correlationIdAccessor.CorrelationId = @event.CorrelationId;
-        using var logScope = logger.BeginScope("CorrelationId:{CorrelationId}", @event.CorrelationId ?? "(yok)");
 
         for (var attempt = 0; ; attempt++)
         {

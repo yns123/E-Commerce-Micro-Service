@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Common;
 using Contracts;
-using EventBus.Outbox;
+using EventBus;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +15,7 @@ namespace Ordering.Api.Controllers;
 [ApiController]
 [Route("api/ordering/orders")]
 [Authorize]
-public sealed class OrdersController(OrderingDbContext db, IOutbox outbox) : ControllerBase
+public sealed class OrdersController(OrderingDbContext db, IEventBus eventBus) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<CreateOrderResponse>> Create(CreateOrderRequest request, CancellationToken ct)
@@ -31,13 +31,13 @@ public sealed class OrdersController(OrderingDbContext db, IOutbox outbox) : Con
         var order = Order.Create(userId, userEmail, mergedItems);
 
         db.Orders.Add(order);
-        outbox.Enqueue(new OrderCreatedIntegrationEvent(
+        await db.SaveChangesAsync(ct);
+
+        await eventBus.PublishAsync(new OrderCreatedIntegrationEvent(
             order.Id,
             userId,
             userEmail,
-            order.Items.Select(i => new OrderItemLine(i.ProductId, i.Quantity)).ToList()));
-
-        await db.SaveChangesAsync(ct);
+            order.Items.Select(i => new OrderItemLine(i.ProductId, i.Quantity)).ToList()), ct);
 
         return Accepted(new CreateOrderResponse(order.Id, order.Status.ToString()));
     }

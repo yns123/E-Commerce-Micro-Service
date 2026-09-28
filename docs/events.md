@@ -17,10 +17,8 @@ public abstract record IntegrationEvent
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public DateTime OccurredAt { get; init; } = DateTime.UtcNow;
-    public string? CorrelationId { get; set; }
 }
 ```
-`CorrelationId` bilinçli olarak `set` (init değil): event nesnesi oluşturulduktan sonra, yayınlanacağı/outbox'a yazılacağı anda EventBus tarafından o anki ambient correlation id ile "damgalanır" (`CorrelationStamper`). Event'i oluşturan kod bu alanı hiç düşünmez.
 Her event record'u `src/BuildingBlocks/Contracts` içinde durur ve routing key'ini sabit olarak taşır:
 ```csharp
 public sealed record OrderCreatedIntegrationEvent(
@@ -59,22 +57,6 @@ Veritabanı olan her tüketici servisin DbContext'inde:
 ProcessedMessages (MessageId Guid PK, ProcessedAt)
 ```
 Handler, iş değişikliklerini ve `ProcessedMessages` kaydını **aynı SaveChangesAsync içinde** yazar. Handler başında MessageId zaten varsa hiçbir şey yapmadan başarılı döner.
-
-## Transactional Outbox (Ordering, Catalog)
-Identity dışındaki, event yayınlayan servisler (Ordering, Catalog) event'i doğrudan RabbitMQ'ya yayınlamaz; `IEventBus.PublishAsync` yerine `IOutbox.Enqueue<T>(event)` çağrılır (`src/BuildingBlocks/EventBus/Outbox`). Bu, event'i o servisin kendi DbContext'indeki `OutboxMessages` tablosuna ekler — henüz kaydetmez. İş değişikliği ve outbox kaydı **aynı `SaveChangesAsync` çağrısında**, tek transaction içinde yazılır:
-```csharp
-db.Orders.Add(order);
-outbox.Enqueue(new OrderCreatedIntegrationEvent(...));   // henüz RabbitMQ'ya gitmedi
-await db.SaveChangesAsync(ct);                            // ikisi de ya birlikte yazılır ya hiç
-```
-Ayrı bir `OutboxDispatcherHostedService<TContext>` (`AddOutbox<TContext>()` ile kayıt edilir) 2 saniyede bir işlenmemiş (`ProcessedAt == null`) mesajları okur, gerçek `IEventBus.PublishAsync` ile RabbitMQ'ya yayınlar ve `ProcessedAt`'i doldurur.
-```
-OutboxMessages (Id Guid PK, Type string, Content string /* JSON */, OccurredAt DateTime, ProcessedAt DateTime?)
-```
-Kazanç: DB kaydı başarılı olduğu halde event'in hiç yayınlanmaması riski ortadan kalkar (yayınlama birkaç saniye gecikebilir; kabul edilebilir). Identity bu deseni kullanmıyor — `identity.user.registered` hâlâ `SaveChangesAsync` sonrası doğrudan `IEventBus.PublishAsync` ile yayınlanıyor (tek event'i olan basit bir akış, ek karmaşıklığa değmiyor).
-
-## Correlation id ve structured logging
-Her `IntegrationEvent`'in `CorrelationId`'si, o event'i tetikleyen HTTP isteğinin (Gateway'den itibaren `X-Correlation-Id` header'ı) ya da tüketilen event'in correlation id'sini taşır — böylece bir siparişin Ordering → Catalog → Ordering → Notification boyunca tüm adımları loglarda tek bir id ile izlenebilir. Mekanizma: `Common` içindeki `ICorrelationIdAccessor` (AsyncLocal tabanlı) o anki ambient id'yi tutar; `CorrelationIdMiddleware` (HTTP servislerinde) header'dan okur/üretir ve `ILogger.BeginScope` ile loglara bağlar; `RabbitMqConsumerHostedService` tüketirken event'in kendi `CorrelationId`'sini ambient değer yapar. `IEventBus.PublishAsync`/`IOutbox.Enqueue` her ikisi de yayınlamadan/outbox'a yazmadan önce event'i ambient id ile damgalar (`CorrelationStamper`) — ambient id yoksa (ör. arka plandaki `OutboxDispatcherHostedService`'in kendi döngüsü) event'in zaten taşıdığı değeri değiştirmez. Konsol logları `SimpleConsoleFormatterOptions.IncludeScopes = true` (`Common.AddStructuredLogging()`) ile scope'ları da basar, böylece `docker compose logs` çıktısında her satırda `=> CorrelationId:...` görünür.
 
 ---
 

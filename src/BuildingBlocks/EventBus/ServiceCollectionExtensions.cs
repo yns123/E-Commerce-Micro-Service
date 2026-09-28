@@ -1,8 +1,6 @@
-using Common.Correlation;
 using Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace EventBus;
@@ -30,7 +28,6 @@ public static class ServiceCollectionExtensions
 {
     public static EventBusBuilder AddEventBus(this IServiceCollection services, IConfiguration configuration, string queueName)
     {
-        services.TryAddSingleton<ICorrelationIdAccessor, CorrelationIdAccessor>();
         services.Configure<EventBusOptions>(configuration.GetSection("RabbitMq"));
         services.AddSingleton(new EventBusQueueName(queueName));
         services.AddSingleton<RabbitMqConnectionManager>();
